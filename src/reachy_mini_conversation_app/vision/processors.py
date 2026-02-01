@@ -5,6 +5,7 @@ import logging
 import threading
 from typing import Any, Dict
 from dataclasses import dataclass
+from typing import Callable, List, Dict
 
 import cv2
 import numpy as np
@@ -206,23 +207,40 @@ class VisionProcessor:
 
 class VisionManager:
     """Manages periodic vision processing and scene understanding."""
-
+    ON_VISION_FOUND_EVENT = "on_vision_found"
     def __init__(self, camera: Any, vision_config: VisionConfig | None = None):
         """Initialize vision manager with camera and configuration."""
         self.camera = camera
         self.vision_config = vision_config or VisionConfig()
         self.vision_interval = self.vision_config.vision_interval
         self.processor = VisionProcessor(self.vision_config)
-
+        self.vision_described = None
         self._last_processed_time = 0.0
         self._stop_event = threading.Event()
         self._thread: threading.Thread | None = None
-
+        self.listeners: Dict[str, List[Callable]] = {}
         # Initialize processor
         if not self.processor.initialize():
             logger.error("Failed to initialize vision processor")
             raise RuntimeError("Vision processor initialization failed")
 
+    def subscribe(self, event_name: str, callback: Callable):
+        """Register a function to an event."""
+        if not callable(callback):
+            raise ValueError("Callback must be a callable function.")
+        self.listeners.setdefault(event_name, []).append(callback)
+        logger.info(f"Subscribed to event '{event_name}'")
+
+    def _emit(self, event_name: str, *args, **kwargs):
+        """Notify all listeners of a specific event."""
+        callbacks = self.listeners.get(event_name, [])
+        for callback in callbacks:
+            try:
+                callback(*args, **kwargs)
+            except Exception as e:
+                logger.error(f"Error in callback for event '{event_name}': {e}")
+    
+    
     def start(self) -> None:
         """Start the vision processing loop in a thread."""
         self._stop_event.clear()
@@ -248,17 +266,18 @@ class VisionManager:
                     if frame is not None:
                         description = self.processor.process_image(
                             frame,
-                            "Briefly describe what you see in one sentence.",
+                            "Briefly describe what you see.",
                         )
 
                         # Only update if we got a valid response
                         if description and not description.startswith(("Vision", "Failed", "Error")):
                             self._last_processed_time = current_time
                             logger.debug(f"Vision update: {description}")
+                            self._emit(self.ON_VISION_FOUND_EVENT, description)
                         else:
                             logger.warning(f"Invalid vision response: {description}")
 
-                time.sleep(1.0)  # Check every second
+                time.sleep(60.0)  # Check every minute
 
             except Exception:
                 logger.exception("Vision processing loop error")
@@ -282,6 +301,7 @@ def initialize_vision_manager(camera_worker: Any) -> VisionManager | None:
 
     Args:
         camera_worker: CameraWorker instance for frame capture
+        callback: Callback function to be called when vision updates are processed
     Returns:
         VisionManager instance or None if initialization fails
 
@@ -317,7 +337,6 @@ def initialize_vision_manager(camera_worker: Any) -> VisionManager | None:
 
         # Initialize vision manager
         vision_manager = VisionManager(camera_worker, vision_config)
-
         # Log device info
         device_info = vision_manager.processor.get_model_info()
         logger.info(

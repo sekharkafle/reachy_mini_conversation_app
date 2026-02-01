@@ -7,6 +7,8 @@ import asyncio
 import argparse
 import threading
 from typing import Any, Dict, List, Optional
+import base64
+import numpy as np
 
 import gradio as gr
 from fastapi import FastAPI
@@ -21,6 +23,13 @@ from reachy_mini_conversation_app.utils import (
     log_connection_troubleshooting,
 )
 
+from reachy_mini_conversation_app.local_tts import tts
+
+import scipy
+import soundfile as sf
+import wave
+
+from reachy_mini_conversation_app.openai_client import get_llm_response
 
 def update_chatbot(chatbot: List[Dict[str, Any]], response: Dict[str, Any]) -> List[Dict[str, Any]]:
     """Update the chatbot with AdditionalOutputs."""
@@ -104,8 +113,30 @@ def run(
         current_robot=robot,
         camera_worker=camera_worker,
     )
-
+   
     head_wobbler = HeadWobbler(set_speech_offsets=movement_manager.set_speech_offsets)
+    
+    def handle_vision_found_event(text: str) -> None:
+        llm_resp = get_llm_response(text)
+        if llm_resp.strip().upper() != "NO":
+            raw_bytes = asyncio.run(tts(llm_resp))
+        for r in raw_bytes:
+            if head_wobbler is not None:
+                audio_base64 = base64.b64encode(r).decode("utf-8")
+                head_wobbler.feed(audio_base64)
+                asyncio.run( handler.output_queue.put(
+                (
+                    22000,
+                    np.frombuffer(r, dtype=np.int16).reshape(1, -1),
+                ),
+            ))
+
+
+    if vision_manager:
+        vision_manager.subscribe(
+            vision_manager.ON_VISION_FOUND_EVENT,
+            handle_vision_found_event
+        )
 
     deps = ToolDependencies(
         reachy_mini=robot,

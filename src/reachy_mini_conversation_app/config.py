@@ -34,6 +34,11 @@ class Config:
     REACHY_MINI_CUSTOM_PROFILE = os.getenv("REACHY_MINI_CUSTOM_PROFILE")
     logger.debug(f"Custom Profile: {REACHY_MINI_CUSTOM_PROFILE}")
 
+    LLM_URL = os.getenv("LLM_URL", "http://localhost:8000/v1")
+    logger.debug(f"LLM URL: {LLM_URL}")
+
+    TTS_URL = os.getenv("TTS_URL", "ws://localhost:8001/ws/tts/stream")
+    logger.debug(f"TTS URL: {TTS_URL}")
 
 config = Config()
 
