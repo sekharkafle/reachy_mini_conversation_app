@@ -41,16 +41,21 @@ The app follows a layered architecture connecting the user, AI services, and rob
 You can set up the project quickly using [uv](https://docs.astral.sh/uv/):
 
 ```bash
-uv venv --python 3.12.1  # Create a virtual environment with Python 3.12.1
+# macOS (Homebrew)
+uv venv --python /opt/homebrew/bin/python3.12 .venv
+
+# Linux / Windows (Python in PATH)
+uv venv --python python3.12 .venv
+
 source .venv/bin/activate
 uv sync
 ```
 
 > [!NOTE]
-> To reproduce the exact dependency set from this repo's `uv.lock`, run `uv sync` with `--locked` (or `--frozen`). This ensures `uv` installs directly from the lockfile without re-resolving or updating any versions.
+> To reproduce the exact dependency set from this repo's `uv.lock`, run `uv sync --frozen`. This ensures `uv` installs directly from the lockfile without re-resolving or updating any versions.
 
 To include optional dependencies:
-```
+```bash
 uv sync --extra reachy_mini_wireless # For wireless Reachy Mini with GStreamer support
 uv sync --extra local_vision         # For local PyTorch/Transformers vision
 uv sync --extra yolo_vision          # For YOLO-based vision
@@ -98,7 +103,9 @@ Some wheels (e.g. PyTorch) are large and require compatible CUDA or CPU builds�
 | `yolo_vision` | YOLOv8 tracking via `ultralytics` and `supervision`. | CPU friendly; supports the `--head-tracker yolo` option.
 | `mediapipe_vision` | Lightweight landmark tracking with MediaPipe. | Works on CPU; enables `--head-tracker mediapipe`.
 | `all_vision` | Convenience alias installing every vision extra. | Install when you want the flexibility to experiment with every provider.
-| `dev` | Developer tooling (`pytest`, `ruff`). | Add on top of either base or `all_vision` environments.
+| `dev` | Developer tooling (`pytest`, `ruff`, `mypy`). | Development-only dependencies. Use `--group dev` with uv or `[dev]` with pip.
+
+**Note:** `dev` is a dependency group (not an optional dependency). With uv, use `--group dev`. With pip, use `[dev]`.
 
 ## Configuration
 
@@ -213,12 +220,21 @@ On top of built-in tools found in the shared library, you can implement custom t
 Custom tools must subclass `reachy_mini_conversation_app.tools.core_tools.Tool` (see `profiles/example/sweep_look.py`).
 
 ### Edit personalities from the UI
-When running with `--gradio`, open the “Personality” accordion:
+When running with `--gradio`, open the "Personality" accordion:
 - Select among available profiles (folders under `src/reachy_mini_conversation_app/profiles/`) or the built‑in default.
-- Click “Apply” to update the current session instructions live.
+- Click "Apply" to update the current session instructions live.
 - Create a new personality by entering a name and instructions text; it stores files under `profiles/<name>/` and copies `tools.txt` from the `default` profile.
 
-Note: The “Personality” panel updates the conversation instructions. Tool sets are loaded at startup from `tools.txt` and are not hot‑reloaded.
+Note: The "Personality" panel updates the conversation instructions. Tool sets are loaded at startup from `tools.txt` and are not hot‑reloaded.
+
+### Locked profile mode
+
+To create a locked variant of the app that cannot switch profiles, edit `src/reachy_mini_conversation_app/config.py` and set the `LOCKED_PROFILE` constant to the desired profile name:
+```python
+LOCKED_PROFILE: str | None = "mars_rover"  # Lock to this profile
+```
+When `LOCKED_PROFILE` is set, the app always uses that profile, ignoring `REACHY_MINI_CUSTOM_PROFILE` env var & the Gradio UI shows "(locked)" and disables all profile editing controls.
+This is useful for creating dedicated clones of the app with a fixed personality. Clone scripts can simply edit this constant to lock the variant.
 
 
 ## Development workflow
