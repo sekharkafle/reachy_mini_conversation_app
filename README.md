@@ -17,7 +17,7 @@ This is a fork from PollenRobotic's Conversational app for the Reachy Mini robot
 
 This uses Nemotron 3 Nano LLM for text inference and Magpie TTS (Preview) for Text to Speech.
 
-Follow the instruction given [here] (https://github.com/pipecat-ai/nemotron-january-2026) to run models locally on an NVIDIA DGX Spark.
+Follow the instruction given [here](https://github.com/pipecat-ai/nemotron-january-2026) to run models locally on an NVIDIA DGX Spark.
 Once the models are up and running, follow the instructions below and run with --local-vision option.
 
 ![Reachy Mini Dance](docs/assets/reachy_mini_dance.gif)
